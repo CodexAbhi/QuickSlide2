@@ -2,7 +2,7 @@
 
 An application that leverages AI to automatically generate professional PowerPoint presentations from text descriptions, voice input, and reference documents.
 
-![AI Presentation Generator](https://github.com/yourusername/ai-presentation-generator/raw/main/docs/images/app-screenshot.png)
+![AI Presentation Generator](https://github.com/CodexAbhi/QuickSlide2/images/image.png)
 
 ## Features
 
