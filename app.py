@@ -44,7 +44,11 @@ with st.container():
     with col1:
         detailed = st.checkbox("Generate detailed content", value=True)
     with col2:
-        st.markdown("👆 Toggle for more or less detailed presentations")
+        theme = st.selectbox(
+            "Select presentation theme:",
+            ["modern_blue", "elegant_dark", "vibrant", "minimal"],
+            index=0
+        )
     
     if st.button("Generate Presentation"):
         if prompt:
@@ -59,9 +63,9 @@ with st.container():
                     if "error" in st.session_state.ppt_content:
                         st.error(f"Error: {st.session_state.ppt_content['error']}")
                     else:
-                        # Generate PPT
+                        # Generate PPT with selected theme
                         with st.spinner("Creating PowerPoint presentation..."):
-                            ppt_gen = PPTGenerator()
+                            ppt_gen = PPTGenerator(theme=theme)
                             ppt = ppt_gen.generate_from_content(st.session_state.ppt_content)
                             
                             # Save to temporary file
@@ -97,6 +101,16 @@ if st.session_state.ppt_content and "error" not in st.session_state.ppt_content:
                     unsafe_allow_html=True)
         
         st.info("You can also modify the content above, then regenerate the presentation.")
+
+        # Show theme preview
+        st.subheader("Theme Preview")
+        theme_preview = {
+            "modern_blue": "https://via.placeholder.com/800x200/0072C6/FFFFFF?text=Modern+Blue+Theme",
+            "elegant_dark": "https://via.placeholder.com/800x200/282828/FFC300?text=Elegant+Dark+Theme",
+            "vibrant": "https://via.placeholder.com/800x200/D50052/FFFFFF?text=Vibrant+Theme",
+            "minimal": "https://via.placeholder.com/800x200/464646/FF674D?text=Minimal+Theme"
+        }
+        st.image(theme_preview.get(theme, theme_preview["modern_blue"]))
 
 # Add some information at the bottom
 st.markdown("---")

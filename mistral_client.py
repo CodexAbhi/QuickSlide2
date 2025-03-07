@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 from dotenv import load_dotenv
 
 # Load API key from .env file
@@ -40,7 +41,10 @@ class MistralClient:
             - Ensure the presentation has a **logical flow** from past to future impacts.
             - Include **real-world examples, case studies, and statistics** where relevant.
             - Balance **technical depth** while keeping it engaging for a general audience.
-
+            - Use **rich text formatting** in your content points:
+                - Use **double asterisks** for important terms or concepts that should be bold
+                - Use *single asterisks* for terms that should be italic
+            
             **Format Requirements:**
             Your response should be a **JSON object** with the following structure:
 
@@ -50,19 +54,21 @@ class MistralClient:
                 "sections": [
                     {
                         "title": "Section Title",
-                        "content": ["Point 1", "Point 2", "Point 3"]
+                        "content": ["Point 1 with **bold** and *italic* text", "Point 2", "Point 3"]
                     }
                 ],
                 "call_to_action": "Key takeaways and next steps"
             }
+            
+            **Important**: The text formatting (bold, italic) in content will be preserved in the final presentation.
 
             **Presentation Structure:**
-            1. **Title Slide**: A compelling title.
+            1. **Title Slide**: A compelling title with subtitle that summarizes the key message.
             2. **Introduction**: A strong hook, why the topic matters, key objectives.
             3. **Historical Context & Current State**: How the topic evolved, key milestones.
-            4. **Future Predictions**: How AI will impact industries, economy, society.
+            4. **Main Sections**: 3-5 distinct sections that explore the topic, each with strong headline.
             5. **Case Studies & Examples**: Real-world applications, companies, research.
-            6. **Challenges & Ethical Considerations**: Bias, job impact, privacy, AI governance.
+            6. **Challenges & Ethical Considerations**: Consider risks and implementation challenges.
             7. **Solutions & Call to Action**: Steps individuals, companies, and governments should take.
             8. **Conclusion**: Summary of key points, an inspiring closing statement.
 
@@ -72,7 +78,7 @@ class MistralClient:
         else:
             system_prompt = """
             Create a concise **but impactful** presentation outline based on the user's prompt.
-
+            
             **Format Requirements:**
             Your response should be a **JSON object** with the following structure:
 
@@ -82,19 +88,23 @@ class MistralClient:
                 "sections": [
                     {
                         "title": "Section Title",
-                        "content": ["Point 1", "Point 2"]
+                        "content": ["Point 1 with **bold** and *italic* text", "Point 2"]
                     }
                 ],
                 "call_to_action": "Key takeaways and next steps"
             }
+            
+            **Important**: The text formatting (bold, italic) in content will be preserved in the final presentation.
 
             **Presentation Structure:**
-            1. **Title Slide**
+            1. **Title Slide**: A catchy and descriptive title with optional subtitle
             2. **Introduction** (Short, with a strong hook)
             3. **3-5 Key Sections** (Each with 2-3 bullet points)
             4. **Conclusion** (Summarize and provide a next step)
 
             Ensure the content remains **insightful, engaging, and logically structured.**
+            Use **rich text formatting** in your content points - bold important terms with **double asterisks** and 
+            italic emphasis with *single asterisks*.
             """
         
         # Call Mistral API
@@ -119,7 +129,6 @@ class MistralClient:
             # Extract the JSON content from the response
             try:
                 content = result["choices"][0]["message"]["content"]
-                import json
                 return json.loads(content)
             except (KeyError, json.JSONDecodeError) as e:
                 return {"error": f"Failed to parse response: {str(e)}"}
