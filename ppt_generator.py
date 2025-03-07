@@ -1,3 +1,4 @@
+#ppt_generator.py
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR, MSO_AUTO_SIZE
@@ -336,8 +337,18 @@ class PPTGenerator:
         
         return slide
     
-    def _distribute_content(self, title, content):
-        """Distribute content across multiple slides if needed"""
+    def _distribute_content(self, title, content, max_slides=None):
+        """
+        Distribute content across multiple slides if needed, respecting the maximum slides limit.
+        
+        Args:
+            title (str): The section title
+            content (list): List of bullet points
+            max_slides (int, optional): Maximum number of slides for this section
+            
+        Returns:
+            list: List of tuples (title, content) for each slide
+        """
         # Process content to split long bullets
         processed_content = []
         
@@ -348,93 +359,138 @@ class PPTGenerator:
             else:
                 processed_content.append(point)
         
+        # If max_slides is specified, we need to adjust content density
+        if max_slides and max_slides > 0:
+            # Calculate minimum points per slide needed to fit within max_slides
+            min_points_per_slide = max(1, len(processed_content) // max_slides)
+            # Adjust MAX_BULLETS_PER_SLIDE if needed to fit content within max_slides
+            points_per_slide = min(self.MAX_BULLETS_PER_SLIDE, 
+                                max(min_points_per_slide, 
+                                    min(7, (len(processed_content) + max_slides - 1) // max_slides)))
+        else:
+            points_per_slide = self.MAX_BULLETS_PER_SLIDE
+        
         # Check if we need multiple slides
-        if len(processed_content) <= self.MAX_BULLETS_PER_SLIDE:
+        if len(processed_content) <= points_per_slide:
             # If content fits on one slide, return it as is
             return [(title, processed_content)]
         
         # Distribute content across multiple slides
         slides_content = []
-        num_slides = (len(processed_content) + self.MAX_BULLETS_PER_SLIDE - 1) // self.MAX_BULLETS_PER_SLIDE
+        num_slides = min(max_slides or float('inf'), 
+                        (len(processed_content) + points_per_slide - 1) // points_per_slide)
+        
+        # Recalculate points per slide to evenly distribute
+        points_per_slide = (len(processed_content) + num_slides - 1) // num_slides
         
         for i in range(num_slides):
-            start_idx = i * self.MAX_BULLETS_PER_SLIDE
-            end_idx = min((i + 1) * self.MAX_BULLETS_PER_SLIDE, len(processed_content))
+            start_idx = i * points_per_slide
+            end_idx = min((i + 1) * points_per_slide, len(processed_content))
             slide_content = processed_content[start_idx:end_idx]
             slides_content.append((title, slide_content))
         
         return slides_content
     
     def generate_from_content(self, content):
-        """Generate a complete PowerPoint from structured content"""
+        """Generate a complete PowerPoint from structured content with accurate slide counting"""
+        # Get target slide count
+        target_slides = int(content.get("target_slides", 15))
+        
         # Add title slide
         self.add_title_slide(content.get("title", "Presentation"), content.get("subtitle", ""))
         
         # Track current section to add section dividers
         current_section = None
         
-        # Process special instructions if any
-        special_instructions = content.get("special_instructions", [])
-        blank_slides = []
+        # Identify major sections for section header slides
+        sections = content.get("sections", [])
+        unique_major_sections = set()
+        for section in sections:
+            section_title = section.get("title", "Section")
+            major_section = section_title.split(":")[0].strip()
+            unique_major_sections.add(major_section)
         
-        for instruction in special_instructions:
-            if isinstance(instruction, dict) and "slide_index" in instruction:
-                # Use the 0-based index directly
-                blank_slides.append(instruction["slide_index"])
-            elif "blank" in instruction.lower() or "empty" in instruction.lower():
-                # Extract slide number from text
-                slide_num_match = re.search(r'slide\s+(\d+)', instruction, re.IGNORECASE)
-                if slide_num_match:
-                    # Convert to 0-based index
-                    slide_num = int(slide_num_match.group(1)) - 1
-                    blank_slides.append(slide_num)
-                    
-        content_slide_index = 0
-        # Add content slides with proper content distribution
-        slide_count = 1  # Start counting after title slide
+        # Calculate fixed slides (title, section headers, closing)
+        fixed_slides = 2  # Title and closing slides
+        fixed_slides += len(unique_major_sections)  # Section header slides
         
-        for section in content.get("sections", []):
-            if content_slide_index in blank_slides:
-            # Add blank slide
-                blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])
+        # Calculate slides available for content
+        available_slides = max(1, target_slides - fixed_slides)
+        
+        # Distribute available slides proportionally among sections
+        section_weights = []
+        for section in sections:
+            # Weight each section by its content length
+            section_content = section.get("content", [])
+            section_weights.append(len(section_content))
+        
+        total_weight = sum(section_weights) or 1  # Avoid division by zero
+        
+        # Calculate target slides per section
+        section_slides = []
+        remaining_slides = available_slides
+        
+        for weight in section_weights:
+            # Proportional distribution with minimum of 1 slide per section
+            slides = max(1, int(round((weight / total_weight) * available_slides)))
+            if slides > remaining_slides:
+                slides = remaining_slides
+            section_slides.append(slides)
+            remaining_slides -= slides
+        
+        # Adjust if we've allocated too many or too few slides
+        while remaining_slides < 0:
+            # Remove slides from the longest sections
+            idx = section_weights.index(max(section_weights))
+            if section_slides[idx] > 1:  # Ensure minimum 1 slide per section
+                section_slides[idx] -= 1
+                remaining_slides += 1
+            section_weights[idx] = 0  # Mark as processed
+        
+        while remaining_slides > 0:
+            # Add slides to sections with most content
+            if max(section_weights) > 0:
+                idx = section_weights.index(max(section_weights))
+                section_slides[idx] += 1
+                remaining_slides -= 1
+                section_weights[idx] = 0  # Mark as processed
             else:
-                section_title = section.get("title", "Section")
-                section_content = section.get("content", [])
-            content_slide_index+=1
+                # If all sections are processed, reset weights and continue
+                section_weights = [len(section.get("content", [])) for section in sections]
+                if sum(section_weights) == 0:
+                    break
+        
+        # Create all slides
+        content_slide_index = 0
+        current_section = None
+        
+        for idx, section in enumerate(sections):
+            section_title = section.get("title", "Section")
+            section_content = section.get("content", [])
+            content_slide_index += 1
             
-            
-            # Check if this is a new major section (optional)
-            if current_section is None or current_section != section_title.split(":")[0]:
-                current_section = section_title.split(":")[0]
+            # Check if this is a new major section
+            major_section = section_title.split(":")[0].strip()
+            if current_section is None or current_section != major_section:
+                current_section = major_section
                 self.add_section_header_slide(current_section)
-                slide_count += 1
             
-            # Check if this slide should be blank (based on slide count)
-            if slide_count in blank_slides:
-                # Add blank slide
-                blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])  # Usually layout 6 is blank
-                slide_count += 1
-                continue
-            
-            # Distribute content across slides if needed
-            distributed_content = self._distribute_content(section_title, section_content)
+            # Distribute content across exactly the number of slides allocated
+            distributed_content = self._distribute_content(
+                section_title, 
+                section_content,
+                max_slides=section_slides[idx]
+            )
             
             # Create slides for this section
-            total_slides = len(distributed_content)
+            total_section_slides = len(distributed_content)
             for slide_idx, (slide_title, slide_content) in enumerate(distributed_content):
-                # Check if we should skip this slide (make it blank)
-                if slide_count in blank_slides:
-                    # Add blank slide
-                    blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])
-                else:
-                    # Add normal content slide
-                    self.add_section_slide(
-                        slide_title, 
-                        slide_content,
-                        slide_number=slide_idx+1, 
-                        total_slides=total_slides
-                    )
-                slide_count += 1
+                self.add_section_slide(
+                    slide_title, 
+                    slide_content,
+                    slide_number=slide_idx+1, 
+                    total_slides=total_section_slides
+                )
         
         # Add a closing slide with call to action if present
         call_to_action = content.get("call_to_action", "")
@@ -443,7 +499,10 @@ class PPTGenerator:
         else:
             self.add_closing_slide()
         
-        return self.ppt
+        # Verify the total number of slides
+        actual_slides = len(self.ppt.slides)
+        
+        return self.ppt, len(self.ppt.slides)
     
     def save(self, filename="presentation.pptx"):
         """Save the presentation to a file"""

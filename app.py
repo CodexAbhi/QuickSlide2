@@ -1,3 +1,4 @@
+#app.py
 import streamlit as st
 import os
 import tempfile
@@ -184,185 +185,209 @@ st.markdown("""
         white-space: pre-wrap;
         border-radius: 4px 4px 0 0;
     }
+    .input-section {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .enhanced-text-area {
+        border: 1px solid #BBD6EC;
+        border-radius: 5px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Title and description
 st.markdown('<p class="main-header">AI Presentation Generator</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Generate professional PowerPoint presentations from simple prompts using AI.</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Generate professional PowerPoint presentations from your input using AI.</p>', unsafe_allow_html=True)
 
-# Main prompt input - Always visible
+# Main input container
 with st.container():
-    prompt = st.text_area(
-        "Enter your presentation topic or prompt:",
-        height=150,
-        placeholder="Example: 'The impact of artificial intelligence on healthcare in the next decade'"
-    )
-
-# Additional input options
-with st.container():
-    st.subheader("Additional Input Methods (Optional)")
+    # Create three columns for different input methods
+    col1, col2 = st.columns([3, 2])
     
-    # Input method selection
-    input_tabs = st.tabs(["Speech Input", "File Upload"])
-    
-    # Speech input
-    with input_tabs[0]:
-        st.markdown("### 🎙️ Record your presentation idea")
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            # Improved audio recorder with better parameters
-            audio_bytes = audio_recorder(
-                text="Click the microphone to start/stop recording",
-                recording_color="#e8585c", 
-                neutral_color="#0072C6",
-                energy_threshold=(-1.0, 1.0),
-                pause_threshold=300.0,  # Increased to 5 minutes
-                sample_rate=44100
-            )
-            
-        with col2:
-            if st.button("Clear Recording"):
-                st.session_state.speech_text = ""
-                # Need to reset the audio_bytes variable somehow
-                # This is challenging because the audio_recorder component doesn't have a clear method
-                # A workaround is to refresh the page
-                st.rerun()
-        
-        if audio_bytes:
-            st.audio(audio_bytes, format="audio/wav")
-            
-            # Transcribe button with improved error handling
-            # Modify the transcribe button code to remove OpenAI API key check
-            if st.button("Transcribe Audio"):
-                with st.spinner("Transcribing..."):
-                    transcribed_text = transcribe_audio(audio_bytes)
-                    if transcribed_text and not transcribed_text.startswith("Error:") and not transcribed_text.startswith("Speech recognition could not understand"):
-                        st.session_state.speech_text = transcribed_text
-                        st.success("Transcription complete!")
-                    else:
-                        st.error(transcribed_text or "Failed to transcribe audio. Please try again.")
-        
-        # Display transcribed text with better formatting
-        if st.session_state.speech_text:
-            st.markdown("##### 📝 Transcribed Text:")
-            st.markdown(f"""
-            <div style='background-color:#f0f2f6;padding:10px;border-radius:5px;'>
-                {st.session_state.speech_text}
-            </div>
-            """, unsafe_allow_html=True)
-            st.info("This text will be combined with your main prompt.")
-    
-    # File upload
-    with input_tabs[1]:
-        st.markdown("### 📄 Upload a reference document")
-        
-        uploaded_file = st.file_uploader(
-            "Upload a file to use as reference for your presentation",
-            type=["txt", "pdf", "docx", "csv", "xlsx", "xls"],
-            help="The content of this file will be analyzed and used to enhance your presentation."
+    with col1:
+        # Primary text input - always required
+        st.markdown("### ✏️ Presentation Topic or Description")
+        prompt = st.text_area(
+            "Enter your presentation topic or detailed description:",
+            height=150,
+            placeholder="Example: 'The impact of artificial intelligence on healthcare in the next decade, covering current technologies, future trends, and ethical considerations.'"
         )
         
-        if uploaded_file is not None:
-            # Process file with progress indicator
-            with st.spinner(f"Processing {uploaded_file.name}..."):
-                extracted_text = extract_text_from_file(uploaded_file)
+        # Supplementary inputs in tabs
+        input_tabs = st.tabs(["Voice Input", "Reference Document"])
+        
+        # Voice input tab
+        with input_tabs[0]:
+            st.markdown("##### 🎙️ Add Voice Description")
+            
+            # Store audio_bytes in session state to handle clearing
+            if 'audio_bytes' not in st.session_state:
+                st.session_state.audio_bytes = None
+            
+            # Only record if not already cleared
+            if not st.session_state.get('cleared_audio', False):
+                audio_bytes = audio_recorder(
+                    text="Click to start/stop recording",
+                    recording_color="#e8585c", 
+                    neutral_color="#0072C6",
+                    energy_threshold=(-1.0, 1.0),
+                    pause_threshold=300.0,
+                    sample_rate=44100
+                )
                 
-                # Check if we got an error message
-                if extracted_text.startswith("Error"):
-                    st.error(extracted_text)
-                else:
-                    st.session_state.file_text = extracted_text
-                    
-                    # Show success with file details
-                    file_size = len(uploaded_file.getvalue()) / 1024  # Size in KB
-                    st.success(f"File '{uploaded_file.name}' ({file_size:.1f} KB) successfully processed")
-                    
-                    # Show preview with expandable section
-                    with st.expander("View extracted content", expanded=False):
-                        if len(extracted_text) > 1000:
-                            preview = extracted_text[:1000] + "... (content truncated for preview)"
-                            st.text_area("File content preview", preview, height=200)
+                if audio_bytes:
+                    st.session_state.audio_bytes = audio_bytes
+            
+            # Add clear recording button
+            if st.button("Clear Recording"):
+                st.session_state.speech_text = ""
+                st.session_state.audio_bytes = None
+                st.session_state.cleared_audio = True
+                st.rerun()
+            
+            # Display audio player and transcribe button only if we have audio
+            if st.session_state.audio_bytes:
+                st.audio(st.session_state.audio_bytes, format="audio/wav")
+                
+                # Transcribe button
+                if st.button("Transcribe Audio"):
+                    with st.spinner("Transcribing..."):
+                        transcribed_text = transcribe_audio(st.session_state.audio_bytes)
+                        if transcribed_text and not transcribed_text.startswith("Error:") and not transcribed_text.startswith("Speech recognition could not understand"):
+                            st.session_state.speech_text = transcribed_text
+                            st.success("Transcription complete!")
                         else:
-                            st.text_area("File content", extracted_text, height=200)
+                            st.error(transcribed_text or "Failed to transcribe audio. Please try again.")
+            
+            # Display transcribed text with better formatting
+            if st.session_state.speech_text:
+                st.markdown("Transcribed Text:")
+                st.markdown(f"""
+                <div style='background-color:#f0f2f6;padding:10px;border-radius:5px;'>
+                    {st.session_state.speech_text}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Reset the cleared_audio flag when user starts a new session or refreshes
+            if st.session_state.get('cleared_audio', False) and not st.session_state.audio_bytes:
+                if st.button("Start New Recording"):
+                    st.session_state.cleared_audio = False
+                    st.rerun()
+        
+        # File upload tab
+        with input_tabs[1]:
+            st.markdown("##### 📄 Add Reference Document")
+            
+            uploaded_file = st.file_uploader(
+                "Upload a document to enhance your presentation",
+                type=["txt", "pdf", "docx", "csv", "xlsx", "xls"],
+                help="Upload research papers, reports, or data to incorporate into your presentation."
+            )
+            
+            if uploaded_file is not None:
+                # Process file with progress indicator
+                with st.spinner(f"Processing {uploaded_file.name}..."):
+                    extracted_text = extract_text_from_file(uploaded_file)
                     
-                    # Explain how it will be used
-                    with st.expander("How this will enhance your presentation", expanded=True):
-                        st.markdown("The AI will analyze this content and incorporate relevant information into your presentation.")
-                        st.markdown("**Examples of what the AI might extract:**")
-                        st.markdown("- Key statistics and figures")
-                        st.markdown("- Important concepts and terminology")
-                        st.markdown("- Structure and organization of ideas")
-                        st.markdown("- Supporting evidence for your main points")
+                    # Check if we got an error message
+                    if extracted_text.startswith("Error"):
+                        st.error(extracted_text)
+                    else:
+                        st.session_state.file_text = extracted_text
+                        
+                        # Show success with file details
+                        file_size = len(uploaded_file.getvalue()) / 1024  # Size in KB
+                        st.success(f"File '{uploaded_file.name}' ({file_size:.1f} KB) successfully processed")
+                        
+                        # Show preview with expandable section
+                        with st.expander("View extracted content", expanded=False):
+                            if len(extracted_text) > 1000:
+                                preview = extracted_text[:1000] + "... (content truncated for preview)"
+                                st.text_area("File content preview", preview, height=200)
+                            else:
+                                st.text_area("File content", extracted_text, height=200)
     
-    # Presentation options
-    st.subheader("Presentation Options")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        detailed = st.checkbox("Generate detailed content", value=True)
     with col2:
+        # Presentation options
+        st.markdown("### Presentation Options")
+        
+        detailed = st.checkbox("Generate detailed content", value=True, 
+                            help="Creates more comprehensive slides with additional information")
+        
         theme = st.selectbox(
             "Select presentation theme:",
             ["modern_blue", "elegant_dark", "vibrant", "minimal"],
-            index=0
+            index=0,
+            help="Visual style for your presentation"
         )
-    
-    # Generate button
-    if st.button("Generate Presentation", type="primary"):
-        # Validate that we have some prompt content
-        if not prompt.strip():
-            st.error("Please enter a presentation topic or prompt to continue.")
-        else:
-            # Combine all inputs to create an enhanced prompt
-            full_prompt = prompt
-            
-            # Add speech input if available
-            if st.session_state.speech_text:
-                full_prompt += f"\n\nAdditional context from speech: {st.session_state.speech_text}"
-            
-            # Add file content if available - handle large content better
-            if st.session_state.file_text:
-                # Truncate very large file content to prevent token limits
-                file_text = st.session_state.file_text
-                if len(file_text) > 4000:  # Arbitrary limit to prevent token overflows
-                    file_text = file_text[:4000] + "... (content truncated for length)"
+        
+        # Add more options if needed
+        st.markdown("### Additional Options")
+        num_slides = st.slider("Approximate slide count:", 10, 25, 15,
+                            help="Target number of slides (actual may vary based on content)")
+        
+        # Generate button
+        if st.button("Generate Presentation", type="primary"):
+            # Check if text prompt is provided
+            if not prompt.strip():
+                st.error("Please provide a presentation topic or description.")
+            else:
+                # Build the prompt combining all inputs
+                full_prompt = prompt.strip()
                 
-                full_prompt += f"\n\nIncorporate the following reference material: {file_text}"
-            
-            # Generate the presentation
-            with st.spinner("Creating your presentation..."):
-                try:
-                    # Initialize Mistral client
-                    client = MistralClient()
-                    
-                    # Generate content
-                    st.session_state.ppt_content = client.generate_content(full_prompt, detailed)
-                    
-                    if "error" in st.session_state.ppt_content:
-                        st.error(f"Error: {st.session_state.ppt_content['error']}")
-                    else:
-                        # Generate PPT with selected theme
-                        ppt_gen = PPTGenerator(theme=theme)
-                        ppt = ppt_gen.generate_from_content(st.session_state.ppt_content)
+                # Combine with voice input if available
+                if st.session_state.speech_text:
+                    full_prompt = f"{full_prompt}\n\nAdditional spoken details: {st.session_state.speech_text}"
+                
+                # Incorporate file content if available
+                if st.session_state.file_text:
+                    full_prompt = f"{full_prompt}\n\nReference material: {st.session_state.file_text}"
+                
+                # Add slide count preference
+                full_prompt = f"{full_prompt}\n\nTarget exactly {num_slides} slides total."
+                
+                # Generate the presentation
+                with st.spinner("Creating your presentation..."):
+                    try:
+                        # Initialize Mistral client
+                        client = MistralClient()
                         
-                        # Save to temporary file
-                        temp_dir = tempfile.mkdtemp()
-                        # Use a safe version of the prompt for the filename
-                        safe_name = ''.join(c if c.isalnum() else '_' for c in prompt[:20]).strip('_')
-                        file_name = f"presentation_{safe_name}.pptx"
-                        file_path = os.path.join(temp_dir, file_name)
-                        ppt_gen.save(file_path)
+                        # Generate content
+                        st.session_state.ppt_content = client.generate_content(full_prompt, detailed)
                         
-                        st.session_state.temp_file_path = file_path
-                        st.session_state.download_ready = True
-                        
-                        # Show presentation ready message
-                        st.success("✅ Your presentation is ready to download!")
-                except Exception as e:
-                    st.error(f"An error occurred: {str(e)}")
-                    st.error("If this is an API error, please check that your Mistral API key is configured correctly in the .env file.")
+                        if "error" in st.session_state.ppt_content:
+                            st.error(f"Error: {st.session_state.ppt_content['error']}")
+                        else:
+                            # Generate PPT with selected theme
+                            ppt_gen = PPTGenerator(theme=theme)
+                            ppt, actual_slide_count = ppt_gen.generate_from_content(st.session_state.ppt_content)
+                            
+                            # Save to temporary file
+                            temp_dir = tempfile.mkdtemp()
+                            # Use a safe version of the prompt for the filename
+                            safe_name = ''.join(c if c.isalnum() else '_' for c in prompt[:20]).strip('_')
+                            if not safe_name:
+                                safe_name = "ai_presentation"
+                            file_name = f"presentation_{safe_name}.pptx"
+                            file_path = os.path.join(temp_dir, file_name)
+                            ppt_gen.save(file_path)
+                            
+                            st.session_state.temp_file_path = file_path
+                            st.session_state.download_ready = True
+                            st.session_state.actual_slide_count = actual_slide_count
+                            
+                            # Show presentation ready message with actual slide count
+                            target_count = num_slides
+                            if actual_slide_count == target_count:
+                                st.success(f"✅ Your presentation with {actual_slide_count} slides is ready to download!")
+                            else:
+                                st.warning(f"✅ Your presentation is ready to download! Note: You requested {target_count} slides, but {actual_slide_count} slides were created to best fit the content.")
+                    except Exception as e:
+                        st.error(f"An error occurred: {str(e)}")
+                        st.error("If this is an API error, please check that your Mistral API key is configured correctly in the .env file.")
 
 # Display only the download link when ready
 if st.session_state.download_ready and st.session_state.temp_file_path:
@@ -373,4 +398,4 @@ if st.session_state.download_ready and st.session_state.temp_file_path:
 
 # Add some information at the bottom
 st.markdown("---")
-st.markdown("This app uses Mistral AI to generate presentation content, OpenAI Whisper for speech transcription, and Python-PPTX to create PowerPoint files.")
+st.markdown("This app uses Mistral AI to generate presentation content, Google's speech recognition for transcription, and Python-PPTX to create PowerPoint files.")

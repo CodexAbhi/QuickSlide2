@@ -1,3 +1,4 @@
+#mistral_client.py
 import os
 import requests
 import json
@@ -19,43 +20,60 @@ class MistralClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        
-    def extract_presentation_instructions(self,text):
+    
+    def extract_presentation_instructions(self, text):
         """
-        Extract specific presentation instructions from text.
+        Extract any presentation instructions from the input text.
         
         Args:
-            text (str): The text content from uploaded file
+            text (str): Input text to analyze for presentation instructions
             
         Returns:
-            dict: Instructions for presentation generation
+            dict: Dictionary with extracted instructions
         """
         instructions = {
-            "slide_instructions": [],
-            "general_instructions": []
+            "general_instructions": [],
+            "slide_instructions": []
         }
         
-        # Look for specific slide instructions
-        slide_pattern = r"(leave|make|create|keep)\s+(the\s+)?(\w+)\s+(slide)\s+(blank|empty)"
-        slide_matches = re.finditer(slide_pattern, text, re.IGNORECASE)
+        # Look for general instructions
+        general_patterns = [
+            r"please (make|create|design) (a|the) presentation (that|which) (.*?)[\.!\?]",
+            r"the presentation should (.*?)[\.!\?]",
+            r"make sure (to|that) (.*?)[\.!\?]"
+        ]
         
-        for match in slide_matches:
-            slide_indicator = match.group(3)
-            action = match.group(5)
-            
-            # Handle both numeric and text indicators
-            if slide_indicator.isdigit():
-                # Convert to 0-indexed for internal use (1 becomes 0)
-                slide_num = int(slide_indicator) - 1
+        for pattern in general_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                instruction = match.group(0)
+                if instruction and len(instruction) > 10:  # Minimal length check
+                    instructions["general_instructions"].append(instruction)
+        
+        # Look for specific slide instructions
+        slide_patterns = [
+            r"(slide|page) (\d+) should (.*?)[\.!\?]",
+            r"(on|in|for) (slide|page) (\d+)[,]? (.*?)[\.!\?]",
+            r"(leave|make) (slide|page) (\d+) (blank|empty)"
+        ]
+        
+        for pattern in slide_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                groups = match.groups()
+                # Extract slide number
+                if "leave" in groups or "make" in groups:
+                    # Format: "leave slide 3 blank"
+                    slide_num = int(groups[2])
+                    action = groups[3]  # blank or empty
+                else:
+                    # Other formats
+                    slide_num_idx = 1 if groups[0].lower() in ["slide", "page"] else 2
+                    slide_num = int(groups[slide_num_idx])
+                    action = groups[-1]
+                
                 instructions["slide_instructions"].append({
-                    "slide_index": slide_num,  # 0-based index
-                    "action": action
-                })
-            elif slide_indicator.lower() in ["first", "second", "third", "fourth", "fifth"]:
-                # Convert word to 0-indexed number
-                num_map = {"first": 0, "second": 1, "third": 2, "fourth": 3, "fifth": 4}
-                instructions["slide_instructions"].append({
-                    "slide_index": num_map.get(slide_indicator.lower(), 0),
+                    "slide_number": slide_num,
                     "action": action
                 })
         
@@ -66,41 +84,45 @@ class MistralClient:
         Generate content using Mistral AI based on the prompt.
 
         Args:
-            prompt (str): The user's input prompt
+            prompt (str): The user's comprehensive input prompt
             detailed (bool): Whether to generate detailed content
 
         Returns:
             dict: Generated content in structured format
         """
-        # Extract instructions from the prompt if it contains file content
-        file_instructions = {}
-        if "Incorporate the following reference material:" in prompt:
-            # Extract file content
-            file_content_start = prompt.find("Incorporate the following reference material:") + len("Incorporate the following reference material:")
-            file_content = prompt[file_content_start:].strip()
-            
-            # Extract instructions from file content
-            file_instructions = self.extract_presentation_instructions(file_content)
-            
-            # Enhance prompt with extracted instructions
-            for instr in file_instructions.get("general_instructions", []):
-                prompt += f"\n\nPlease follow this specific instruction: {instr}"
-            
-            # Add slide instructions in a structured format
-            if file_instructions.get("slide_instructions"):
-                prompt += "\n\nSpecific slide instructions:"
-                for instr in file_instructions.get("slide_instructions", []):
-                    prompt += f"\n- Make slide {instr['slide_number']} {instr['action']}"
+        # Extract instructions from the entire prompt
+        instructions = self.extract_presentation_instructions(prompt)
+        
+        # Extract slide count from the prompt
+        slide_count_match = re.search(r'Target exactly (\d+) slides total', prompt)
+        target_slides = int(slide_count_match.group(1)) if slide_count_match else 15
+        
+        # Enhance prompt with extracted instructions as needed
+        enhanced_prompt = prompt
+        for instr in instructions.get("general_instructions", []):
+            if instr not in enhanced_prompt:
+                enhanced_prompt += f"\n\nPlease follow this specific instruction: {instr}"
+        
+        # Add slide instructions in a structured format if they're not already in the prompt
+        if instructions.get("slide_instructions"):
+            if "Specific slide instructions:" not in enhanced_prompt:
+                enhanced_prompt += "\n\nSpecific slide instructions:"
+                for instr in instructions.get("slide_instructions", []):
+                    enhanced_prompt += f"\n- Make slide {instr['slide_number']} {instr['action']}"
 
-        # Rest of your generate_content method remains the same...
-        # Include the extracted instructions in your system prompt
-        system_prompt = """
-        You are an expert presentation content creator specializing in insightful and structured AI-driven presentations.
+        # Set detail level based on user preference
+        detail_level = "highly detailed and comprehensive" if detailed else "concise and focused"
+        
+        # System prompt with updated instructions
+        system_prompt = f"""
+        You are an expert presentation content creator specializing in insightful and {detail_level} AI-driven presentations.
         
         **Instructions:**
-        - Create a **comprehensive, well-structured** presentation based on the user's prompt.
+        - Create a **well-structured** presentation based on the user's input.
+        - CRITICALLY IMPORTANT: Generate EXACTLY {target_slides} slides total, including title and closing slides.
+        - You MUST output content that will result in EXACTLY {target_slides} slides when processed.
         - If specific slide instructions are provided (like 'leave slide 3 blank'), you MUST follow them exactly.
-        - Ensure the presentation has a **logical flow** from past to future impacts.
+        - Ensure the presentation has a **logical flow** with clear progression between topics.
         - Include **real-world examples, case studies, and statistics** where relevant.
         - Balance **technical depth** while keeping it engaging for a general audience.
         - Use **rich text formatting** in your content points:
@@ -110,21 +132,29 @@ class MistralClient:
         **Format Requirements:**
         Your response should be a **JSON object** with the following structure:
 
-        {
+        {{
             "title": "Presentation Title",
             "subtitle": "Optional Subtitle",
+            "target_slides": {target_slides},
             "sections": [
-                {
+                {{
                     "title": "Section Title",
                     "content": ["Point 1 with **bold** and *italic* text", "Point 2", "Point 3"]
-                }
+                }}
             ],
             "call_to_action": "Key takeaways and next steps",
             "special_instructions": []
-        }
+        }}
         
-        **Important**: The text formatting (bold, italic) in content will be preserved in the final presentation.
-        If asked to leave certain slides blank, add a special instruction in the "special_instructions" array.
+        **Important Notes for Achieving {target_slides} Slides:** 
+        - The presentation will ALWAYS include title and closing slides (2 slides total).
+        - Each major section (before the colon in section titles) gets a section header slide.
+        - Content slides have a maximum of 7 bullet points each.
+        - If a section has more bullet points, it will be split across multiple slides.
+        - To ensure you hit exactly {target_slides} slides:
+        1. Carefully plan your major sections (each adds 1 slide)
+        2. Adjust the number of content bullet points to achieve the right slide count
+        3. Include the exact "target_slides" value of {target_slides} in your JSON response
         """
         
         # Call Mistral API
@@ -136,7 +166,7 @@ class MistralClient:
                     "model": "mistral-large-latest",
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": enhanced_prompt}
                     ],
                     "temperature": 0.7,
                     "response_format": {"type": "json_object"}
@@ -149,7 +179,13 @@ class MistralClient:
             # Extract the JSON content from the response
             try:
                 content = result["choices"][0]["message"]["content"]
-                return json.loads(content)
+                data = json.loads(content)
+                
+                # Ensure target_slides is included
+                if "target_slides" not in data:
+                    data["target_slides"] = target_slides
+                    
+                return data
             except (KeyError, json.JSONDecodeError) as e:
                 return {"error": f"Failed to parse response: {str(e)}"}
                 

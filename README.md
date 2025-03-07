@@ -1,54 +1,135 @@
 # AI Presentation Generator
 
-A Streamlit application that generates PowerPoint presentations from text prompts using Mistral AI.
+An application that leverages AI to automatically generate professional PowerPoint presentations from text descriptions, voice input, and reference documents.
+
+![AI Presentation Generator](https://github.com/yourusername/ai-presentation-generator/raw/main/docs/images/app-screenshot.png)
 
 ## Features
 
-- Generate detailed or concise presentation content from simple prompts
-- Automatic organization of content into slides with appropriate sections
-- Export to PowerPoint (.pptx) format
-- Clean and user-friendly interface
+- **Multi-modal Input**: Create presentations from text descriptions, voice recordings, or uploaded documents
+- **AI-powered Content Generation**: Uses Mistral AI to generate structured, coherent presentation content
+- **Professional Slide Design**: Automated creation of visually appealing slides with proper formatting and layout
+- **Multiple Themes**: Choose from different presentation styles
+- **Voice-to-Text**: Record and transcribe your presentation ideas using Google's speech recognition
+- **Document Analysis**: Extract content from TXT, PDF, DOCX, CSV, and XLSX files to incorporate into presentations
+- **Customizable Slide Count**: Control the approximate number of slides in your presentation
 
-## Setup
+## Installation
+
+### Prerequisites
+
+- Python 3.8+
+- pip package manager
+
+### Setup
 
 1. Clone this repository:
-```
-git clone https://github.com/yourusername/ai-presentation-generator.git
-cd ai-presentation-generator
-```
 
-2. Install the required dependencies:
-```
-pip install -r requirements.txt
-```
+   ```bash
+   git clone https://github.com/yourusername/ai-presentation-generator.git
+   cd ai-presentation-generator
+   ```
 
-3. Create a `.env` file in the project root with your Mistral API key:
-```
-MISTRAL_API_KEY=your_mistral_api_key_here
-```
+2. Install dependencies:
 
-4. Run the application:
-```
-streamlit run app.py
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Create a `.env` file in the project root with your API keys:
+
+   ```
+   MISTRAL_API_KEY=your_mistral_api_key
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+
+   You can obtain these API keys from:
+
+   - [Mistral AI](https://console.mistral.ai/)
+   - [OpenAI](https://platform.openai.com/)
 
 ## Usage
 
-1. Enter a topic or detailed prompt in the text area
-2. Toggle the "Generate detailed content" checkbox based on your needs
-3. Click "Generate Presentation" 
-4. Review the generated content and download the PowerPoint file
+### Starting the Application
+
+Run the Streamlit app:
+
+```bash
+streamlit run app.py
+```
+
+The application will be available at `http://localhost:8501` in your web browser.
+
+### Creating a Presentation
+
+1. Enter your presentation topic or description in the text area
+2. Optionally:
+   - Record a voice description
+   - Upload a reference document (TXT, PDF, DOCX, CSV, XLSX)
+3. Configure presentation options:
+   - Select whether to generate detailed content
+   - Choose a presentation theme
+   - Set the approximate slide count
+4. Click "Generate Presentation"
+5. Download the PPTX file when it's ready
 
 ## Project Structure
 
 - `app.py`: Main Streamlit application
-- `mistral_client.py`: Handles interactions with the Mistral AI API
-- `ppt_generator.py`: PowerPoint generation logic
-- `.env`: Stores your API key (not tracked in git)
+- `mistral_client.py`: Client for interacting with Mistral AI API
+- `ppt_generator.py`: PowerPoint generation using python-pptx
+- `requirements.txt`: Project dependencies
 
-## Future Enhancements
+## Key Components
 
-- Additional PowerPoint themes
-- Custom slide templates
-- Image generation for slides
-- Saving and loading presentation drafts
+### PPT Generator
+
+The PowerPoint generator takes structured content from the AI and creates visually appealing slides with proper formatting, including:
+
+- Title slides
+- Section headers
+- Content slides with bullet points
+- Closing slides
+
+### Mistral AI Integration
+
+The application uses Mistral AI's large language model to:
+
+- Parse user input for presentation requirements
+- Structure content into logical sections
+- Generate detailed bullet points
+- Create a cohesive presentation flow
+
+### Voice Input & Document Analysis
+
+- Voice recordings are transcribed using Google's speech recognition
+- Document analysis extracts content from various file formats to enhance presentations
+
+## Requirements
+
+```
+streamlit
+python-pptx
+openai
+python-dotenv
+docx2txt
+PyPDF2
+pandas
+audio-recorder-streamlit
+SpeechRecognition
+```
+
+## Future Improvements
+
+- Add image generation capabilities using DALL-E or Stable Diffusion
+- Implement custom template uploads
+- Add collaborative editing features
+- Support for more presentation formats (beyond PPTX)
+- Enhance the UI with preview capabilities
+
+## Acknowledgments
+
+- Mistral AI for the content generation API
+- Google for speech recognition capabilities
+- Streamlit for the web application framework
+- Python-PPTX for PowerPoint generation capabilities
