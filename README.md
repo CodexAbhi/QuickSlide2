@@ -2,7 +2,7 @@
 
 An application that leverages AI to automatically generate professional PowerPoint presentations from text descriptions, voice input, and reference documents.
 
-![cover](https://github.com/user-attachments/assets/d20eb429-4401-4afc-a4a0-9240ce085870)
+<img src="https://github.com/user-attachments/assets/d20eb429-4401-4afc-a4a0-9240ce085870" alt="cover" width="400"/>
 
 ## Features
 
