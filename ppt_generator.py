@@ -195,7 +195,18 @@ class PPTGenerator:
         # Adjust title if multiple slides for same section
         display_title = title
         if total_slides > 1:
-            display_title = f"{title} ({slide_number}/{total_slides})"
+            left = Inches(9)  # Right side
+            top = Inches(6.5)  # Bottom
+            width = Inches(0.5)
+            height = Inches(0.3)
+            
+            textbox = slide.shapes.add_textbox(left, top, width, height)
+            tf = textbox.text_frame
+            p = tf.add_paragraph()
+            p.text = f"{slide_number}/{total_slides}"
+            p.alignment = PP_ALIGN.RIGHT
+            p.font.size = Pt(10)  # Smaller font
+            p.font.color.rgb = self.theme_colors["secondary"]
         
         # Set slide title with enhanced styling
         title_shape = slide.shapes.title
@@ -367,19 +378,30 @@ class PPTGenerator:
         blank_slides = []
         
         for instruction in special_instructions:
-            if "blank" in instruction.lower() or "empty" in instruction.lower():
-                # Extract slide number
+            if isinstance(instruction, dict) and "slide_index" in instruction:
+                # Use the 0-based index directly
+                blank_slides.append(instruction["slide_index"])
+            elif "blank" in instruction.lower() or "empty" in instruction.lower():
+                # Extract slide number from text
                 slide_num_match = re.search(r'slide\s+(\d+)', instruction, re.IGNORECASE)
                 if slide_num_match:
-                    slide_num = int(slide_num_match.group(1))
+                    # Convert to 0-based index
+                    slide_num = int(slide_num_match.group(1)) - 1
                     blank_slides.append(slide_num)
-        
+                    
+        content_slide_index = 0
         # Add content slides with proper content distribution
         slide_count = 1  # Start counting after title slide
         
         for section in content.get("sections", []):
-            section_title = section.get("title", "Section")
-            section_content = section.get("content", [])
+            if content_slide_index in blank_slides:
+            # Add blank slide
+                blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])
+            else:
+                section_title = section.get("title", "Section")
+                section_content = section.get("content", [])
+            content_slide_index+=1
+            
             
             # Check if this is a new major section (optional)
             if current_section is None or current_section != section_title.split(":")[0]:

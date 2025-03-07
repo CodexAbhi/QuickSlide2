@@ -36,36 +36,28 @@ class MistralClient:
         }
         
         # Look for specific slide instructions
-        slide_pattern = r"(leave|make|create)\s+(\w+)\s+slide\s+(blank|empty)"
+        slide_pattern = r"(leave|make|create|keep)\s+(the\s+)?(\w+)\s+(slide)\s+(blank|empty)"
         slide_matches = re.finditer(slide_pattern, text, re.IGNORECASE)
         
         for match in slide_matches:
-            slide_num = match.group(2)
-            action = match.group(3)
-            if slide_num.isdigit():
+            slide_indicator = match.group(3)
+            action = match.group(5)
+            
+            # Handle both numeric and text indicators
+            if slide_indicator.isdigit():
+                # Convert to 0-indexed for internal use (1 becomes 0)
+                slide_num = int(slide_indicator) - 1
                 instructions["slide_instructions"].append({
-                    "slide_number": int(slide_num),
+                    "slide_index": slide_num,  # 0-based index
                     "action": action
                 })
-            elif slide_num in ["first", "second", "third", "fourth", "fifth"]:
-                # Convert word to number
-                num_map = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
+            elif slide_indicator.lower() in ["first", "second", "third", "fourth", "fifth"]:
+                # Convert word to 0-indexed number
+                num_map = {"first": 0, "second": 1, "third": 2, "fourth": 3, "fifth": 4}
                 instructions["slide_instructions"].append({
-                    "slide_number": num_map.get(slide_num, 0),
+                    "slide_index": num_map.get(slide_indicator.lower(), 0),
                     "action": action
                 })
-        
-        # Extract other general instructions
-        general_patterns = [
-            r"use\s+(.+?)\s+theme",
-            r"add\s+(.+?)\s+to\s+(.+?)\s+slide",
-            r"include\s+(.+?)\s+in\s+presentation"
-        ]
-        
-        for pattern in general_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                instructions["general_instructions"].append(match.group(0))
         
         return instructions
     
