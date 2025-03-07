@@ -26,8 +26,8 @@ An application that leverages AI to automatically generate professional PowerPoi
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/yourusername/ai-presentation-generator.git
-   cd ai-presentation-generator
+   git clone [https://github.com/CodexAbhi/QuickSlide2](https://github.com/CodexAbhi/QuickSlide2)
+   cd QuickSlide2
    ```
 
 2. Install dependencies:
