@@ -2,7 +2,7 @@
 
 An application that leverages AI to automatically generate professional PowerPoint presentations from text descriptions, voice input, and reference documents.
 
-![AI Presentation Generator]
+![AI Presentation Generator](https://github.com/CodexAbhi/QuickSlide2/images/cover.jpeg)
 
 
 ## Features
@@ -27,7 +27,7 @@ An application that leverages AI to automatically generate professional PowerPoi
 1. Clone this repository:
 
    ```bash
-   git clone [https://github.com/CodexAbhi/QuickSlide2]
+   git clone [https://github.com/CodexAbhi/QuickSlide2] (https://github.com/CodexAbhi/QuickSlide2)
    cd QuickSlide2
    ```
 
