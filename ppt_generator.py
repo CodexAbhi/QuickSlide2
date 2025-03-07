@@ -362,7 +362,21 @@ class PPTGenerator:
         # Track current section to add section dividers
         current_section = None
         
+        # Process special instructions if any
+        special_instructions = content.get("special_instructions", [])
+        blank_slides = []
+        
+        for instruction in special_instructions:
+            if "blank" in instruction.lower() or "empty" in instruction.lower():
+                # Extract slide number
+                slide_num_match = re.search(r'slide\s+(\d+)', instruction, re.IGNORECASE)
+                if slide_num_match:
+                    slide_num = int(slide_num_match.group(1))
+                    blank_slides.append(slide_num)
+        
         # Add content slides with proper content distribution
+        slide_count = 1  # Start counting after title slide
+        
         for section in content.get("sections", []):
             section_title = section.get("title", "Section")
             section_content = section.get("content", [])
@@ -371,6 +385,14 @@ class PPTGenerator:
             if current_section is None or current_section != section_title.split(":")[0]:
                 current_section = section_title.split(":")[0]
                 self.add_section_header_slide(current_section)
+                slide_count += 1
+            
+            # Check if this slide should be blank (based on slide count)
+            if slide_count in blank_slides:
+                # Add blank slide
+                blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])  # Usually layout 6 is blank
+                slide_count += 1
+                continue
             
             # Distribute content across slides if needed
             distributed_content = self._distribute_content(section_title, section_content)
@@ -378,12 +400,19 @@ class PPTGenerator:
             # Create slides for this section
             total_slides = len(distributed_content)
             for slide_idx, (slide_title, slide_content) in enumerate(distributed_content):
-                self.add_section_slide(
-                    slide_title, 
-                    slide_content,
-                    slide_number=slide_idx+1, 
-                    total_slides=total_slides
-                )
+                # Check if we should skip this slide (make it blank)
+                if slide_count in blank_slides:
+                    # Add blank slide
+                    blank_slide = self.ppt.slides.add_slide(self.ppt.slide_layouts[6])
+                else:
+                    # Add normal content slide
+                    self.add_section_slide(
+                        slide_title, 
+                        slide_content,
+                        slide_number=slide_idx+1, 
+                        total_slides=total_slides
+                    )
+                slide_count += 1
         
         # Add a closing slide with call to action if present
         call_to_action = content.get("call_to_action", "")
